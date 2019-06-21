@@ -1,0 +1,5 @@
+#!/bin/bas
+pushd ..
+source venv_ingegneria/bin/activate
+pip freeze > requirements.txt
+popd
