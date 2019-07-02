@@ -1,3 +1,6 @@
 config.py
 venv_ingegneria
 __pycache__
+.DS_Store
+.vscode/
+test.py
