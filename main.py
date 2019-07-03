@@ -8,7 +8,8 @@ import requests
 
 
 def start(update, context):
-    start_msg = 'Bot dmi'
+    start_msg = 'Benvenuto. Questo bot ti permetterá di cercare i contatti dei' \
+        'professori che ti interessano e gli orari di lezione di oggi.'
     update.message.reply_markdown(start_msg)
 
 
