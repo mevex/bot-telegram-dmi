@@ -3,15 +3,25 @@ from config import TOKEN
 from config_ext import ALLOWED_CHARS
 from utility import sanitize, generate_email
 
-from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, Filters
 
-from bs4 import BeautifulSoup
 import requests
+import telebot
+from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, Filters
+from bs4 import BeautifulSoup
+from telegram import ReplyKeyboardMarkup
+from telebot import types
 
 
 def start(update, context):
-    start_msg = 'Bot dmi'
-    update.message.reply_markdown(start_msg)
+    start_msg = 'Benvenuto. Questo bot ti permetterá di cercare i contatti dei' \
+        ' professori che ti interessano e gli orari di lezione di oggi.'
+    markup = types.ReplyKeyboardMarkup(
+        one_time_keyboard=True, resize_keyboard=True)
+    button_search = types.KeyboardButton('/cerca_professore', )
+    button_plan = types.KeyboardButton('/mostra_orario')
+    markup.row(button_search, button_plan)
+    chat_id = update.message.chat_id
+    tb.send_message(chat_id=chat_id, text=start_msg, reply_markup=markup)
 
 
 def ask_professor_name(update, context):
@@ -78,8 +88,6 @@ def cancel(update, context):
     return ConversationHandler.END
 
 
-updater = Updater(token=TOKEN, use_context=True)
-dp = updater.dispatcher
 search_cnv = ConversationHandler(
     entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
 
@@ -90,6 +98,9 @@ search_cnv = ConversationHandler(
     fallbacks=[CommandHandler('cancel', cancel)]
 )
 
+updater = Updater(token=TOKEN, use_context=True)
+dp = updater.dispatcher
+tb = telebot.TeleBot(TOKEN)
 dp.add_handler(search_cnv)
 dp.add_handler(CommandHandler('start', start))
 dp.add_handler(CommandHandler('mostra_orario', show_planner))
