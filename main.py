@@ -1,6 +1,5 @@
 #!/root/Documents/progetto_ingegneria/venv_ingegneria/bin/python3
 from config import TOKEN
-import telegram
 import requests
 import telebot
 from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, Filters
@@ -49,8 +48,46 @@ def search_professor(update, context):
 
 
 def show_planner(update, context):
-    planner_msg = 'Orario del giorno'
+    # STAMPA GIORNO
+    planner_msg = "Di che giorno vuoi sapere l'orario delle lezioni"
     update.message.reply_markdown(planner_msg)
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0'}
+    payload = {'key1': 'value1', 'key2': 'value2'}
+    url = 'https://servizi.dmi.unipg.it/mrbs/day.php?year=2019&month=06&day=5&area=1&room=3'
+    r = requests.get(url=url, params=payload, headers=headers)
+    content = BeautifulSoup(r.content, 'html.parser')
+    giorno = content.find_all(attrs={'id': 'dwm'})[0].text
+    message = giorno.title()
+    update.message.reply_markdown(message)
+    # STAMPA AULA E LEZIONI/ESAMI
+
+    r = requests.get(url=url)
+
+    content = BeautifulSoup(r.content, 'html.parser')
+    rows = content.find('table', id='day_main').tbody.find_all('tr')
+
+    for row in rows:
+        cols = row.find_all('td')
+        hours = 9
+        if cols[0].div.a.text == 'NB19':
+            break
+        for col in cols:
+            class_value = col['class'][0]
+            if class_value == 'row_labels':
+                message = '*' + col.div.a.text.split('(')[0] + '*\n'
+            elif class_value == 'new':
+                hours += 1
+            else:
+                ore = 'dalle ore ' + str(hours)
+                hours += int(col.get('colspan'))
+                ore += ' alle ore ' + str(hours)
+                message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
+                    col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
+
+        update.message.reply_markdown(message)
+
+    return ConversationHandler.END
 
 
 def cancel(update, context):
