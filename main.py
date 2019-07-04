@@ -1,5 +1,8 @@
 #!/root/Documents/progetto_ingegneria/venv_ingegneria/bin/python3
 from config import TOKEN
+from config_ext import ALLOWED_CHARS
+from utility import sanitize, generate_email
+
 import requests
 import telebot
 from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, Filters
@@ -27,51 +30,83 @@ def ask_professor_name(update, context):
 
 
 def search_professor(update, context):
-    prof = update.message.text
+    prof = update.message.text.lower()
+    prof = sanitize(prof, ALLOWED_CHARS)
+    print(prof)
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0'}
     data = {'search_text': prof, 'search_type': 'cognome'}
     url = 'https://www.unipg.it/rubrica'
-    r = requests.post(url=url, data=data, headers=headers)
+
+    try:
+        r = requests.post(url=url, data=data, headers=headers)
+    except:
+        message = "Spiacente, si è verificato un errore inaspettato.\n Riprova"
+        update.message.reply_markdown(message)
+        return ConversationHandler.END
 
     content = BeautifulSoup(r.content, 'html.parser')
-    professore = content.find_all(
-        attrs={'class': 'up-fontsize-150 border-bottom mb-2', 'itemprop': 'name'})[0].text
-    telefono = content.find_all(attrs={'itemprop': 'telephone'})[0].text
-    split = professore.split()
-    email = split[1].lower() + '.' + split[0].lower() + '@unipg.it'
 
-    message = 'Professore: ' + professore.title() + \
-        '\nTelefono: ' + telefono.replace(' ', '') + '\nEmail: ' + email
-    update.message.reply_markdown(message)
+    miss_error = list(content.find_all(attrs={'class': 'alert-message'}))
+    if not miss_error:
+        nome = content.find_all(
+            attrs={'class': 'up-fontsize-150 border-bottom mb-2', 'itemprop': 'name'})
+        tel = content.find_all(attrs={'itemprop': 'telephone'})
+
+        professori = []
+        dict_professore = {}
+        for i in range(0, len(nome)):
+            email = generate_email(nome[i].text)
+            dict_professore['nome'] = nome[i].text.title()
+            dict_professore['tel'] = tel[i].text.replace(
+                ' ', '') if tel else 'Non presente'
+            dict_professore['email'] = email if email else 'Non presente'
+
+            professori.append(dict(dict_professore))
+
+        for prof in professori:
+            message = '*Professore:* {nome}\n*Telefono:* {tel}\n *Email:* {email}'.format(
+                nome=prof['nome'], tel=prof['tel'], email=prof['email'],)
+            update.message.reply_markdown(message)
+
+    else:
+        message = 'Spiacente, nessun professore trovato relativo al cognome ' + prof.capitalize()
+        update.message.reply_markdown(message)
+
     return ConversationHandler.END
 
 
+def ask_day(update, context):
+    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni (giorno/mese/anno)"
+    update.message.reply_markdown(ask_msg)
+    return 1
+
+
 def show_planner(update, context):
-    # STAMPA GIORNO
-    planner_msg = "Di che giorno vuoi sapere l'orario delle lezioni"
-    update.message.reply_markdown(planner_msg)
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0'}
-    payload = {'key1': 'value1', 'key2': 'value2'}
-    url = 'https://servizi.dmi.unipg.it/mrbs/day.php?year=2019&month=06&day=5&area=1&room=3'
-    r = requests.get(url=url, params=payload, headers=headers)
+    giorno = update.message.text.split()[0]
+    mese = update.message.text.split()[1]
+    anno = update.message.text.split()[2]
+    payload = {'year': anno, 'month': mese,
+               'day': giorno, 'area': '1', 'room': '3'}
+    url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
+
+    r = requests.get(url=url, params=payload)
+
     content = BeautifulSoup(r.content, 'html.parser')
-    giorno = content.find_all(attrs={'id': 'dwm'})[0].text
-    message = giorno.title()
+    data = content.find_all(attrs={'id': 'dwm'})[0].text
+    message = data.title()
     update.message.reply_markdown(message)
-    # STAMPA AULA E LEZIONI/ESAMI
 
-    r = requests.get(url=url)
-
-    content = BeautifulSoup(r.content, 'html.parser')
     rows = content.find('table', id='day_main').tbody.find_all('tr')
 
     for row in rows:
         cols = row.find_all('td')
         hours = 9
+        lessons = False
+
         if cols[0].div.a.text == 'NB19':
             break
+
         for col in cols:
             class_value = col['class'][0]
             if class_value == 'row_labels':
@@ -79,13 +114,14 @@ def show_planner(update, context):
             elif class_value == 'new':
                 hours += 1
             else:
+                lessons = True
                 ore = 'dalle ore ' + str(hours)
                 hours += int(col.get('colspan'))
                 ore += ' alle ore ' + str(hours)
                 message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
                     col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
-
-        update.message.reply_markdown(message)
+        if lessons:
+            update.message.reply_markdown(message)
 
     return ConversationHandler.END
 
@@ -106,12 +142,25 @@ search_cnv = ConversationHandler(
     fallbacks=[CommandHandler('cancel', cancel)]
 )
 
+planner_cnv = ConversationHandler(
+    entry_points=[CommandHandler('mostra_orario', ask_day)],
+
+    states={
+        1: [MessageHandler(Filters.text, show_planner)]
+    },
+
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
+
 updater = Updater(token=TOKEN, use_context=True)
 dp = updater.dispatcher
 tb = telebot.TeleBot(TOKEN)
 dp.add_handler(search_cnv)
+dp.add_handler(planner_cnv)
 dp.add_handler(CommandHandler('start', start))
 dp.add_handler(CommandHandler('mostra_orario', show_planner))
 
 updater.start_polling()
+print('Ready to rock')
+
 updater.idle()
