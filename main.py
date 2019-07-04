@@ -3,7 +3,6 @@ from config import TOKEN
 from config_ext import ALLOWED_CHARS
 from utility import sanitize, generate_email
 
-
 import requests
 import telebot
 from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, Filters
@@ -77,9 +76,54 @@ def search_professor(update, context):
     return ConversationHandler.END
 
 
+def ask_day(update, context):
+    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni (giorno/mese/anno)"
+    update.message.reply_markdown(ask_msg)
+    return 1
+
+
 def show_planner(update, context):
-    planner_msg = 'Orario del giorno'
-    update.message.reply_markdown(planner_msg)
+    giorno = update.message.text.split()[0]
+    mese = update.message.text.split()[1]
+    anno = update.message.text.split()[2]
+    payload = {'year': anno, 'month': mese,
+               'day': giorno, 'area': '1', 'room': '3'}
+    url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
+
+    r = requests.get(url=url, params=payload)
+
+    content = BeautifulSoup(r.content, 'html.parser')
+    data = content.find_all(attrs={'id': 'dwm'})[0].text
+    message = data.title()
+    update.message.reply_markdown(message)
+
+    rows = content.find('table', id='day_main').tbody.find_all('tr')
+
+    for row in rows:
+        cols = row.find_all('td')
+        hours = 9
+        lessons = False
+
+        if cols[0].div.a.text == 'NB19':
+            break
+
+        for col in cols:
+            class_value = col['class'][0]
+            if class_value == 'row_labels':
+                message = '*' + col.div.a.text.split('(')[0] + '*\n'
+            elif class_value == 'new':
+                hours += 1
+            else:
+                lessons = True
+                ore = 'dalle ore ' + str(hours)
+                hours += int(col.get('colspan'))
+                ore += ' alle ore ' + str(hours)
+                message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
+                    col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
+        if lessons:
+            update.message.reply_markdown(message)
+
+    return ConversationHandler.END
 
 
 def cancel(update, context):
@@ -98,10 +142,21 @@ search_cnv = ConversationHandler(
     fallbacks=[CommandHandler('cancel', cancel)]
 )
 
+planner_cnv = ConversationHandler(
+    entry_points=[CommandHandler('mostra_orario', ask_day)],
+
+    states={
+        1: [MessageHandler(Filters.text, show_planner)]
+    },
+
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
+
 updater = Updater(token=TOKEN, use_context=True)
 dp = updater.dispatcher
 tb = telebot.TeleBot(TOKEN)
 dp.add_handler(search_cnv)
+dp.add_handler(planner_cnv)
 dp.add_handler(CommandHandler('start', start))
 dp.add_handler(CommandHandler('mostra_orario', show_planner))
 
