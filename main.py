@@ -76,31 +76,37 @@ def search_professor(update, context):
     return ConversationHandler.END
 
 
+def ask_day(update, context):
+    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni (giorno/mese/anno)"
+    update.message.reply_markdown(ask_msg)
+    return 1
+
+
 def show_planner(update, context):
-    # STAMPA GIORNO
-    planner_msg = "Di che giorno vuoi sapere l'orario delle lezioni"
-    update.message.reply_markdown(planner_msg)
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0'}
-    payload = {'key1': 'value1', 'key2': 'value2'}
-    url = 'https://servizi.dmi.unipg.it/mrbs/day.php?year=2019&month=06&day=5&area=1&room=3'
-    r = requests.get(url=url, params=payload, headers=headers)
+    giorno = update.message.text.split()[0]
+    mese = update.message.text.split()[1]
+    anno = update.message.text.split()[2]
+    payload = {'year': anno, 'month': mese,
+               'day': giorno, 'area': '1', 'room': '3'}
+    url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
+
+    r = requests.get(url=url, params=payload)
+
     content = BeautifulSoup(r.content, 'html.parser')
-    giorno = content.find_all(attrs={'id': 'dwm'})[0].text
-    message = giorno.title()
+    data = content.find_all(attrs={'id': 'dwm'})[0].text
+    message = data.title()
     update.message.reply_markdown(message)
-    # STAMPA AULA E LEZIONI/ESAMI
 
-    r = requests.get(url=url)
-
-    content = BeautifulSoup(r.content, 'html.parser')
     rows = content.find('table', id='day_main').tbody.find_all('tr')
 
     for row in rows:
         cols = row.find_all('td')
         hours = 9
+        lessons = False
+
         if cols[0].div.a.text == 'NB19':
             break
+
         for col in cols:
             class_value = col['class'][0]
             if class_value == 'row_labels':
@@ -108,13 +114,14 @@ def show_planner(update, context):
             elif class_value == 'new':
                 hours += 1
             else:
+                lessons = True
                 ore = 'dalle ore ' + str(hours)
                 hours += int(col.get('colspan'))
                 ore += ' alle ore ' + str(hours)
                 message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
                     col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
-
-        update.message.reply_markdown(message)
+        if lessons:
+            update.message.reply_markdown(message)
 
     return ConversationHandler.END
 
@@ -135,10 +142,21 @@ search_cnv = ConversationHandler(
     fallbacks=[CommandHandler('cancel', cancel)]
 )
 
+planner_cnv = ConversationHandler(
+    entry_points=[CommandHandler('mostra_orario', ask_day)],
+
+    states={
+        1: [MessageHandler(Filters.text, show_planner)]
+    },
+
+    fallbacks=[CommandHandler('cancel', cancel)]
+)
+
 updater = Updater(token=TOKEN, use_context=True)
 dp = updater.dispatcher
 tb = telebot.TeleBot(TOKEN)
 dp.add_handler(search_cnv)
+dp.add_handler(planner_cnv)
 dp.add_handler(CommandHandler('start', start))
 dp.add_handler(CommandHandler('mostra_orario', show_planner))
 
