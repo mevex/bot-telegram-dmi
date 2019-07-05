@@ -1,8 +1,9 @@
-#!/root/Documents/progetto_ingegneria/venv_ingegneria/bin/python3
+#!venv_ingegneria/bin/python3
 from config import TOKEN
 from config_ext import ALLOWED_CHARS
-from utility import sanitize, generate_email
+from utility import sanitize, generate_email, month_convertion
 
+import datetime
 import requests
 import telebot
 import re
@@ -84,14 +85,25 @@ def ask_day(update, context):
 
 
 def show_planner(update, context):
-    reg_ex = r'^([0-2][0-9]|(3)[0-1])(\s)(((0)[1-9])|((1)[0-2]))(\s)((\d{2})|(\d{4}))$'
-    input_data = update.message.text
+    reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottebre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
+    input_data = update.message.text.lower()
     result = re.match(reg_ex, input_data)
 
     if result:
         giorno = update.message.text.split()[0]
-        mese = update.message.text.split()[1]
+        if update.message.text.split()[1].isdigit():
+            mese = update.message.text.split()[1]
+        else:
+            mese = month_convertion(update.message.text.split()[1])
         anno = update.message.text.split()[2]
+
+        try:
+            datetime.datetime(int(anno), int(mese), int(giorno))
+        except ValueError:
+            error = 'Data inesistente'
+            update.message.reply_markdown(error)
+            return ConversationHandler.END
+
         payload = {'year': anno, 'month': mese,
                    'day': giorno, 'area': '1', 'room': '3'}
         url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
@@ -104,6 +116,7 @@ def show_planner(update, context):
         update.message.reply_markdown(message)
 
         rows = content.find('table', id='day_main').tbody.find_all('tr')
+        empty = True
 
         for row in rows:
             cols = row.find_all('td')
@@ -121,6 +134,7 @@ def show_planner(update, context):
                     hours += 1
                 else:
                     lessons = True
+                    empty = False
                     ore = 'dalle ore ' + str(hours)
                     hours += int(col.get('colspan'))
                     ore += ' alle ore ' + str(hours)
@@ -128,12 +142,17 @@ def show_planner(update, context):
                         col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
             if lessons:
                 update.message.reply_markdown(message)
+
+        if empty:
+            message = 'Non ci sono lezioni nella data scelta'
+            update.message.reply_markdown(message)
+
         return ConversationHandler.END
 
     else:
         fail = 'Input giorno non valido'
         update.message.reply_markdown(fail)
-        ask_day(update, context)
+        return ConversationHandler.END
 
 
 def cancel(update, context):
