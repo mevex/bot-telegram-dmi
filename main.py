@@ -1,10 +1,12 @@
 #!venv_ingegneria/bin/python3
 from config import TOKEN
 from config_ext import ALLOWED_CHARS
-from utility import sanitize, generate_email
+from utility import sanitize, generate_email, month_convertion
 
+import datetime
 import requests
 import telebot
+import re
 from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHandler, Filters
 from bs4 import BeautifulSoup
 from telegram import ReplyKeyboardMarkup
@@ -12,12 +14,12 @@ from telebot import types
 
 
 def start(update, context):
-    start_msg = 'Benvenuto. Questo bot ti permetterá di cercare i contatti dei' \
-        ' professori che ti interessano e gli orari di lezione di oggi.'
+    start_msg = 'Benvenuto. Questo bot ti permetterà di cercare i contatti dei' \
+        ' professori che ti interessano e gli orari di lezione.'
     markup = types.ReplyKeyboardMarkup(
         one_time_keyboard=True, resize_keyboard=True)
     button_search = types.KeyboardButton('/cerca_professore', )
-    button_plan = types.KeyboardButton('/mostra_orario')
+    button_plan = types.KeyboardButton('/orario_lezioni')
     markup.row(button_search, button_plan)
     chat_id = update.message.chat_id
     tb.send_message(chat_id=chat_id, text=start_msg, reply_markup=markup)
@@ -81,53 +83,82 @@ def search_professor(update, context):
 
 
 def ask_day(update, context):
-    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni (giorno/mese/anno)"
+    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni (giorno mese anno)"
     update.message.reply_markdown(ask_msg)
     return 1
 
 
 def show_planner(update, context):
-    giorno = update.message.text.split()[0]
-    mese = update.message.text.split()[1]
-    anno = update.message.text.split()[2]
-    payload = {'year': anno, 'month': mese,
-               'day': giorno, 'area': '1', 'room': '3'}
-    url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
+    reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottebre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
+    input_data = update.message.text.lower()
+    result = re.match(reg_ex, input_data)
 
-    r = requests.get(url=url, params=payload)
+    if result:
+        if '/' in input_data:
+            giorno, mese, anno = update.message.text.split('/')
+            if not mese.isdigit():
+                mese = month_convertion(mese)
+        else:
+            giorno, mese, anno = update.message.text.split()
+            if not mese.isdigit():
+                mese = month_convertion(mese)
 
-    content = BeautifulSoup(r.content, 'html.parser')
-    data = content.find_all(attrs={'id': 'dwm'})[0].text
-    message = data.title()
-    update.message.reply_markdown(message)
+        try:
+            datetime.datetime(int(anno), int(mese), int(giorno))
+        except ValueError:
+            error = 'Data inesistente'
+            update.message.reply_markdown(error)
+            return ConversationHandler.END
 
-    rows = content.find('table', id='day_main').tbody.find_all('tr')
+        payload = {'year': anno, 'month': mese,
+                   'day': giorno, 'area': '1', 'room': '3'}
+        url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
 
-    for row in rows:
-        cols = row.find_all('td')
-        hours = 9
-        lessons = False
+        r = requests.get(url=url, params=payload)
 
-        if cols[0].div.a.text == 'NB19':
-            break
+        content = BeautifulSoup(r.content, 'html.parser')
+        data = content.find_all(attrs={'id': 'dwm'})[0].text
+        message = data.title()
+        update.message.reply_markdown(message)
 
-        for col in cols:
-            class_value = col['class'][0]
-            if class_value == 'row_labels':
-                message = '*' + col.div.a.text.split('(')[0] + '*\n'
-            elif class_value == 'new':
-                hours += 1
-            else:
-                lessons = True
-                ore = 'dalle ore ' + str(hours)
-                hours += int(col.get('colspan'))
-                ore += ' alle ore ' + str(hours)
-                message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
-                    col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
-        if lessons:
+        rows = content.find('table', id='day_main').tbody.find_all('tr')
+        empty = True
+
+        for row in rows:
+            cols = row.find_all('td')
+            hours = 9
+            lessons = False
+
+            if cols[0].div.a.text == 'NB19':
+                break
+
+            for col in cols:
+                class_value = col['class'][0]
+                if class_value == 'row_labels':
+                    message = '*' + col.div.a.text.split('(')[0] + '*\n'
+                elif class_value == 'new':
+                    hours += 1
+                else:
+                    lessons = True
+                    empty = False
+                    ore = 'dalle ore ' + str(hours)
+                    hours += int(col.get('colspan'))
+                    ore += ' alle ore ' + str(hours)
+                    message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
+                        col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
+            if lessons:
+                update.message.reply_markdown(message)
+
+        if empty:
+            message = 'Non ci sono lezioni nella data scelta'
             update.message.reply_markdown(message)
 
-    return ConversationHandler.END
+        return ConversationHandler.END
+
+    else:
+        fail = 'Input giorno non valido'
+        update.message.reply_markdown(fail)
+        return ConversationHandler.END
 
 
 def cancel(update, context):
@@ -147,7 +178,7 @@ search_cnv = ConversationHandler(
 )
 
 planner_cnv = ConversationHandler(
-    entry_points=[CommandHandler('mostra_orario', ask_day)],
+    entry_points=[CommandHandler('orario_lezioni', ask_day)],
 
     states={
         1: [MessageHandler(Filters.text, show_planner)]
@@ -162,7 +193,6 @@ tb = telebot.TeleBot(TOKEN)
 dp.add_handler(search_cnv)
 dp.add_handler(planner_cnv)
 dp.add_handler(CommandHandler('start', start))
-dp.add_handler(CommandHandler('mostra_orario', show_planner))
 
 updater.start_polling()
 print('Ready to rock')
