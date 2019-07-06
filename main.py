@@ -183,7 +183,6 @@ def cancel(update, context):
 
 def main():
     # Create the two main conversation for the bot
-
     search_cnv = ConversationHandler(
         entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
 
@@ -216,7 +215,6 @@ def main():
     print('Ready to rock')
 
     updater.idle()
-
 
 if __name__ == '__main__':
     main()
