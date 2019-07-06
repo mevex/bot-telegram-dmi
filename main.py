@@ -49,7 +49,7 @@ def search_professor(update, context):
         update.message.reply_markdown(message)
         return 1
 
-    content = BeautifulSoup(r.content, 'html.parser')
+    content = BeautifulSoup(r.content, 'lxml')
 
     miss_error = list(content.find_all(attrs={'class': 'alert-message'}))
     if not miss_error:
@@ -118,7 +118,7 @@ def show_planner(update, context):
 
         r = requests.get(url=url, params=payload)
 
-        content = BeautifulSoup(r.content, 'html.parser')
+        content = BeautifulSoup(r.content, 'lxml')
         data = content.find_all(attrs={'id': 'dwm'})[0].text
         message = data.title()
         update.message.reply_markdown(message)
@@ -137,7 +137,8 @@ def show_planner(update, context):
             for col in cols:
                 class_value = col['class'][0]
                 if class_value == 'row_labels':
-                    message = '*' + col.div.a.text.split('(')[0] + '*\n'
+                    aula = col.div.a.text.split('(')[0]
+                    message = '*{aula}*\n'.format(aula=aula)
                 elif class_value == 'new':
                     hours += 1
                 else:
@@ -146,8 +147,11 @@ def show_planner(update, context):
                     ore = 'dalle ore ' + str(hours)
                     hours += int(col.get('colspan'))
                     ore += ' alle ore ' + str(hours)
-                    message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
-                        col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
+                    lezione = col.div.a.text.title()
+                    prof = col.div.sub.text.title()
+
+                    message += '\t\t• {lezione} ~ {prof}\n\t\t\t\t\t\t{ore}\n'.format(
+                        lezione=lezione, prof=prof, ore=ore)
             if lessons:
                 update.message.reply_markdown(message)
 
