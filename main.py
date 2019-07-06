@@ -56,6 +56,7 @@ def search_professor(update, context):
         nome = content.find_all(
             attrs={'class': 'up-fontsize-150 border-bottom mb-2', 'itemprop': 'name'})
         tel = content.find_all(attrs={'itemprop': 'telephone'})
+        html_professori = content.find_all('dl', attrs={'class': 'row'})
 
         professori = []
         dict_professore = {}
@@ -68,10 +69,13 @@ def search_professor(update, context):
 
             professori.append(dict(dict_professore))
 
-        for prof in professori:
-            message = '*Professore:* {nome}\n*Telefono:* {tel}\n *Email:* {email}'.format(
-                nome=prof['nome'], tel=prof['tel'], email=prof['email'],)
-            update.message.reply_markdown(message)
+        for index, prof in enumerate(professori):
+            campi = html_professori[index].find_all('dd')
+            for campo in campi:
+                if campo.text == 'Dipartimento di matematica e informatica':
+                    message = '*Professore:* {nome}\n*Telefono:* {tel}\n *Email:* {email}'.format(
+                        nome=prof['nome'], tel=prof['tel'], email=prof['email'],)
+                    update.message.reply_markdown(message)
 
     else:
         message = 'Spiacente, nessun professore trovato relativo al cognome {cognome}.\n Riprova a scriverlo'.format(
