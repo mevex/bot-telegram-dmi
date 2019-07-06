@@ -7,16 +7,26 @@ def sanitize(word: str, allowed_characters: list) -> str:
 
 
 def generate_email(name: str) -> str:
-    split = name.lower().split()
+    name = name.lower()
+    if name == 'de lillo silvana':
+        return 'silvana.delillo@unipg.it'
+    if name == 'mamone capria marco':
+        return 'marco.mamonecapria@unipg.it'
+    if name == 'nucci maria clara':
+        return 'mariaclara.nucci@unipg.it'
+    if name == 'pinotti maria cristina':
+        return 'cristina.pinotti@unipg.it'
+
+    split = name.split()
     email = '{nome}.{cognome}@unipg.it'.format(
         nome=split[1], cognome=split[0])
-
-    # TODO Handle exceptions
 
     return email
 
 
 def month_convertion(month: str) -> str:
+    if month.isdigit():
+        return month
     if month == 'gennaio':
         return '1'
     elif month == 'febbraio':

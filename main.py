@@ -74,7 +74,7 @@ def search_professor(update, context):
             for campo in campi:
                 if campo.text == 'Dipartimento di matematica e informatica':
                     message = '*Professore:* {nome}\n*Telefono:* {tel}\n *Email:* {email}'.format(
-                        nome=prof['nome'], tel=prof['tel'], email=prof['email'],)
+                        nome=prof['nome'], tel=prof['tel'], email=prof['email'])
                     update.message.reply_markdown(message)
 
     else:
@@ -100,12 +100,10 @@ def show_planner(update, context):
     if result:
         if '/' in input_data:
             giorno, mese, anno = update.message.text.split('/')
-            if not mese.isdigit():
-                mese = month_convertion(mese)
+            mese = month_convertion(mese)
         else:
             giorno, mese, anno = update.message.text.split()
-            if not mese.isdigit():
-                mese = month_convertion(mese)
+            mese = month_convertion(mese)
 
         try:
             datetime.datetime(int(anno), int(mese), int(giorno))
