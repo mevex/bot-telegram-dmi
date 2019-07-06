@@ -1,8 +1,10 @@
 #!venv_ingegneria/bin/python3
+# Own imports
 from config import TOKEN
 from config_ext import ALLOWED_CHARS
 from utility import sanitize, generate_email, month_convertion
 
+# External imports
 import datetime
 import requests
 import telebot
@@ -32,6 +34,7 @@ def ask_professor_name(update, context):
 
 
 def search_professor(update, context):
+    # Get the message from the user and prepare the post call
     prof = update.message.text.lower()
     prof = sanitize(prof, ALLOWED_CHARS)
     print(prof)
@@ -51,6 +54,7 @@ def search_professor(update, context):
 
     content = BeautifulSoup(r.content, 'lxml')
 
+    # Check if there search produced results
     miss_error = list(content.find_all(attrs={'class': 'alert-message'}))
     if not miss_error:
         nome = content.find_all(
@@ -93,6 +97,8 @@ def ask_day(update, context):
 
 
 def show_planner(update, context):
+    # Get the message from the user
+    # and see if it matches the expected format
     reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottebre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
     input_data = update.message.text.lower()
     result = re.match(reg_ex, input_data)
@@ -105,6 +111,8 @@ def show_planner(update, context):
             giorno, mese, anno = update.message.text.split()
             mese = month_convertion(mese)
 
+        # If the input provided is well formatted
+        # check that the date actually exists
         try:
             datetime.datetime(int(anno), int(mese), int(giorno))
         except ValueError:
@@ -173,34 +181,43 @@ def cancel(update, context):
     return ConversationHandler.END
 
 
-search_cnv = ConversationHandler(
-    entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
+def main():
+    # Create the two main conversation for the bot
 
-    states={
-        1: [MessageHandler(Filters.text, search_professor)]
-    },
+    search_cnv = ConversationHandler(
+        entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
 
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+        states={
+            1: [MessageHandler(Filters.text, search_professor)]
+        },
 
-planner_cnv = ConversationHandler(
-    entry_points=[CommandHandler('orario_lezioni', ask_day)],
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
-    states={
-        1: [MessageHandler(Filters.text, show_planner)]
-    },
+    planner_cnv = ConversationHandler(
+        entry_points=[CommandHandler('orario_lezioni', ask_day)],
 
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+        states={
+            1: [MessageHandler(Filters.text, show_planner)]
+        },
 
-updater = Updater(token=TOKEN, use_context=True)
-dp = updater.dispatcher
-tb = telebot.TeleBot(TOKEN)
-dp.add_handler(search_cnv)
-dp.add_handler(planner_cnv)
-dp.add_handler(CommandHandler('start', start))
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
-updater.start_polling()
-print('Ready to rock')
+    # Main bot startup settings
+    updater = Updater(token=TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(search_cnv)
+    dp.add_handler(planner_cnv)
+    dp.add_handler(CommandHandler('start', start))
 
-updater.idle()
+    # Start pooling messages, actual bot start
+    updater.start_polling()
+    print('Ready to rock')
+
+    updater.idle()
+
+
+if __name__ == '__main__':
+    main()
+    tb = telebot.TeleBot(TOKEN)
