@@ -1,4 +1,4 @@
-#!/root/Documents/progetto_ingegneria/venv_ingegneria/bin/python3
+#!venv_ingegneria/bin/python3
 from config import TOKEN
 from config_ext import ALLOWED_CHARS
 from utility import sanitize, generate_email
@@ -43,7 +43,9 @@ def search_professor(update, context):
     except:
         message = "Spiacente, si è verificato un errore inaspettato.\n Riprova"
         update.message.reply_markdown(message)
-        return ConversationHandler.END
+        message = 'Scrivi il cognome del professore di cui vuoi sapere i contatti'
+        update.message.reply_markdown(message)
+        return 1
 
     content = BeautifulSoup(r.content, 'html.parser')
 
@@ -70,8 +72,10 @@ def search_professor(update, context):
             update.message.reply_markdown(message)
 
     else:
-        message = 'Spiacente, nessun professore trovato relativo al cognome ' + prof.capitalize()
+        message = 'Spiacente, nessun professore trovato relativo al cognome {cognome}.\n Riprova a scriverlo'.format(
+            cognome=prof.capitalize())
         update.message.reply_markdown(message)
+        return 1
 
     return ConversationHandler.END
 
