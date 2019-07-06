@@ -1,3 +1,3 @@
 import string
 
-ALLOWED_CHARS = list(string.ascii_lowercase)
+ALLOWED_CHARS = list(string.ascii_lowercase + ' ')

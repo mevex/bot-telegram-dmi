@@ -1,8 +1,10 @@
 #!venv_ingegneria/bin/python3
+# Own imports
 from config import TOKEN
 from config_ext import ALLOWED_CHARS
 from utility import sanitize, generate_email, month_convertion
 
+# External imports
 import datetime
 import requests
 import telebot
@@ -32,6 +34,7 @@ def ask_professor_name(update, context):
 
 
 def search_professor(update, context):
+    # Get the message from the user and prepare the post call
     prof = update.message.text.lower()
     prof = sanitize(prof, ALLOWED_CHARS)
     print(prof)
@@ -49,13 +52,15 @@ def search_professor(update, context):
         update.message.reply_markdown(message)
         return 1
 
-    content = BeautifulSoup(r.content, 'html.parser')
+    content = BeautifulSoup(r.content, 'lxml')
 
+    # Check if there search produced results
     miss_error = list(content.find_all(attrs={'class': 'alert-message'}))
     if not miss_error:
         nome = content.find_all(
             attrs={'class': 'up-fontsize-150 border-bottom mb-2', 'itemprop': 'name'})
         tel = content.find_all(attrs={'itemprop': 'telephone'})
+        html_professori = content.find_all('dl', attrs={'class': 'row'})
 
         professori = []
         dict_professore = {}
@@ -68,10 +73,13 @@ def search_professor(update, context):
 
             professori.append(dict(dict_professore))
 
-        for prof in professori:
-            message = '*Professore:* {nome}\n*Telefono:* {tel}\n *Email:* {email}'.format(
-                nome=prof['nome'], tel=prof['tel'], email=prof['email'],)
-            update.message.reply_markdown(message)
+        for index, prof in enumerate(professori):
+            campi = html_professori[index].find_all('dd')
+            for campo in campi:
+                if campo.text == 'Dipartimento di matematica e informatica':
+                    message = '*Professore:* {nome}\n*Telefono:* {tel}\n *Email:* {email}'.format(
+                        nome=prof['nome'], tel=prof['tel'], email=prof['email'])
+                    update.message.reply_markdown(message)
 
     else:
         message = 'Spiacente, nessun professore trovato relativo al cognome {cognome}.\n Riprova a scriverlo'.format(
@@ -89,6 +97,8 @@ def ask_day(update, context):
 
 
 def show_planner(update, context):
+    # Get the message from the user
+    # and see if it matches the expected format
     reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottebre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
     input_data = update.message.text.lower()
     result = re.match(reg_ex, input_data)
@@ -96,13 +106,13 @@ def show_planner(update, context):
     if result:
         if '/' in input_data:
             giorno, mese, anno = update.message.text.split('/')
-            if not mese.isdigit():
-                mese = month_convertion(mese)
+            mese = month_convertion(mese)
         else:
             giorno, mese, anno = update.message.text.split()
-            if not mese.isdigit():
-                mese = month_convertion(mese)
+            mese = month_convertion(mese)
 
+        # If the input provided is well formatted
+        # check that the date actually exists
         try:
             datetime.datetime(int(anno), int(mese), int(giorno))
         except ValueError:
@@ -116,7 +126,7 @@ def show_planner(update, context):
 
         r = requests.get(url=url, params=payload)
 
-        content = BeautifulSoup(r.content, 'html.parser')
+        content = BeautifulSoup(r.content, 'lxml')
         data = content.find_all(attrs={'id': 'dwm'})[0].text
         message = data.title()
         update.message.reply_markdown(message)
@@ -135,7 +145,8 @@ def show_planner(update, context):
             for col in cols:
                 class_value = col['class'][0]
                 if class_value == 'row_labels':
-                    message = '*' + col.div.a.text.split('(')[0] + '*\n'
+                    aula = col.div.a.text.split('(')[0]
+                    message = '*{aula}*\n'.format(aula=aula)
                 elif class_value == 'new':
                     hours += 1
                 else:
@@ -144,8 +155,11 @@ def show_planner(update, context):
                     ore = 'dalle ore ' + str(hours)
                     hours += int(col.get('colspan'))
                     ore += ' alle ore ' + str(hours)
-                    message += '\t\t• ' + col.div.a.text.title() + ' ~ ' + \
-                        col.div.sub.text.title() + '\n\t\t\t\t\t\t' + ore + '\n'
+                    lezione = col.div.a.text.title()
+                    prof = col.div.sub.text.title()
+
+                    message += '\t\t• {lezione} ~ {prof}\n\t\t\t\t\t\t{ore}\n'.format(
+                        lezione=lezione, prof=prof, ore=ore)
             if lessons:
                 update.message.reply_markdown(message)
 
@@ -168,6 +182,7 @@ def cancel(update, context):
 
 
 def main():
+    # Create the two main conversation for the bot
     search_cnv = ConversationHandler(
         entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
 
@@ -188,17 +203,18 @@ def main():
         fallbacks=[CommandHandler('cancel', cancel)]
     )
 
+    # Main bot startup settings
     updater = Updater(token=TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(search_cnv)
     dp.add_handler(planner_cnv)
     dp.add_handler(CommandHandler('start', start))
 
+    # Start pooling messages, actual bot start
     updater.start_polling()
     print('Ready to rock')
 
     updater.idle()
-
 
 if __name__ == '__main__':
     main()
