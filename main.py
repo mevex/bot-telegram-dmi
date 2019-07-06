@@ -167,34 +167,39 @@ def cancel(update, context):
     return ConversationHandler.END
 
 
-search_cnv = ConversationHandler(
-    entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
+def main():
+    search_cnv = ConversationHandler(
+        entry_points=[CommandHandler('cerca_professore', ask_professor_name)],
 
-    states={
-        1: [MessageHandler(Filters.text, search_professor)]
-    },
+        states={
+            1: [MessageHandler(Filters.text, search_professor)]
+        },
 
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
-planner_cnv = ConversationHandler(
-    entry_points=[CommandHandler('orario_lezioni', ask_day)],
+    planner_cnv = ConversationHandler(
+        entry_points=[CommandHandler('orario_lezioni', ask_day)],
 
-    states={
-        1: [MessageHandler(Filters.text, show_planner)]
-    },
+        states={
+            1: [MessageHandler(Filters.text, show_planner)]
+        },
 
-    fallbacks=[CommandHandler('cancel', cancel)]
-)
+        fallbacks=[CommandHandler('cancel', cancel)]
+    )
 
-updater = Updater(token=TOKEN, use_context=True)
-dp = updater.dispatcher
-tb = telebot.TeleBot(TOKEN)
-dp.add_handler(search_cnv)
-dp.add_handler(planner_cnv)
-dp.add_handler(CommandHandler('start', start))
+    updater = Updater(token=TOKEN, use_context=True)
+    dp = updater.dispatcher
+    dp.add_handler(search_cnv)
+    dp.add_handler(planner_cnv)
+    dp.add_handler(CommandHandler('start', start))
 
-updater.start_polling()
-print('Ready to rock')
+    updater.start_polling()
+    print('Ready to rock')
 
-updater.idle()
+    updater.idle()
+
+
+if __name__ == '__main__':
+    main()
+    tb = telebot.TeleBot(TOKEN)
