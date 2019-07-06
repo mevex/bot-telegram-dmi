@@ -90,12 +90,14 @@ def show_planner(update, context):
     result = re.match(reg_ex, input_data)
 
     if result:
-        giorno = update.message.text.split()[0]
-        if update.message.text.split()[1].isdigit():
-            mese = update.message.text.split()[1]
+        if '/' in input_data:
+            giorno, mese, anno = update.message.text.split('/')
+            if not mese.isdigit():
+                mese = month_convertion(mese)
         else:
-            mese = month_convertion(update.message.text.split()[1])
-        anno = update.message.text.split()[2]
+            giorno, mese, anno = update.message.text.split()
+            if not mese.isdigit():
+                mese = month_convertion(mese)
 
         try:
             datetime.datetime(int(anno), int(mese), int(giorno))
@@ -187,7 +189,6 @@ tb = telebot.TeleBot(TOKEN)
 dp.add_handler(search_cnv)
 dp.add_handler(planner_cnv)
 dp.add_handler(CommandHandler('start', start))
-dp.add_handler(CommandHandler('orario_lezioni', show_planner))
 
 updater.start_polling()
 print('Ready to rock')
