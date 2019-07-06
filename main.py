@@ -72,7 +72,7 @@ def search_professor(update, context):
             update.message.reply_markdown(message)
 
     else:
-        message = 'Spiacente, nessun professore trovato relativo al cognome {cognome}.\n Riprova a sccriverlo'.format(
+        message = 'Spiacente, nessun professore trovato relativo al cognome {cognome}.\n Riprova a scriverlo'.format(
             cognome=prof.capitalize())
         update.message.reply_markdown(message)
         return 1
