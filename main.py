@@ -16,6 +16,7 @@ from telebot import types
 
 
 def start(update, context):
+    tb = telebot.TeleBot(TOKEN)
     start_msg = 'Benvenuto. Questo bot ti permetterà di cercare i contatti dei' \
         ' professori che ti interessano e gli orari di lezione.'
     markup = types.ReplyKeyboardMarkup(
@@ -37,7 +38,6 @@ def search_professor(update, context):
     # Get the message from the user and prepare the post call
     prof = update.message.text.lower()
     prof = sanitize(prof, ALLOWED_CHARS)
-    print(prof)
     headers = {
         'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101 Firefox/60.0'}
     data = {'search_text': prof, 'search_type': 'cognome'}
@@ -91,7 +91,7 @@ def search_professor(update, context):
 
 
 def ask_day(update, context):
-    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni (giorno mese anno)"
+    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni?\n(giorno mese anno)"
     update.message.reply_markdown(ask_msg)
     return 1
 
@@ -176,7 +176,7 @@ def show_planner(update, context):
 
 
 def cancel(update, context):
-    cancel_msg = '...'
+    cancel_msg = 'Operazione annullata'
     update.message.reply_markdown(cancel_msg)
     return ConversationHandler.END
 
@@ -216,6 +216,6 @@ def main():
 
     updater.idle()
 
+
 if __name__ == '__main__':
     main()
-    tb = telebot.TeleBot(TOKEN)
