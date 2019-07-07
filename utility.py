@@ -45,7 +45,7 @@ def month_convertion(month: str) -> str:
         return '8'
     elif month == 'settembre':
         return '9'
-    elif month == 'ottombre':
+    elif month == 'ottobre':
         return '10'
     elif month == 'novembre':
         return '11'

@@ -99,7 +99,7 @@ def ask_day(update, context):
 def show_planner(update, context):
     # Get the message from the user
     # and see if it matches the expected format
-    reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottebre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
+    reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
     input_data = update.message.text.lower()
     result = re.match(reg_ex, input_data)
 
