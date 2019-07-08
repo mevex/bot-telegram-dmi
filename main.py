@@ -13,17 +13,17 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, ConversationHa
 from bs4 import BeautifulSoup
 from telegram import ReplyKeyboardMarkup
 from telebot import types
+tb = telebot.TeleBot(TOKEN)
 
 
 def start(update, context):
-    tb = telebot.TeleBot(TOKEN)
     start_msg = 'Benvenuto. Questo bot ti permetterà di cercare i contatti dei' \
         ' professori che ti interessano e gli orari di lezione.'
     markup = types.ReplyKeyboardMarkup(
         one_time_keyboard=True, resize_keyboard=True)
-    button_search = types.KeyboardButton('/cerca_professore', )
-    button_plan = types.KeyboardButton('/orario_lezioni')
-    markup.row(button_search, button_plan)
+    search_button = types.KeyboardButton('/cerca_professore')
+    plan_button = types.KeyboardButton('/orario_lezioni')
+    markup.row(search_button, plan_button)
     chat_id = update.message.chat_id
     tb.send_message(chat_id=chat_id, text=start_msg, reply_markup=markup)
 
@@ -91,37 +91,50 @@ def search_professor(update, context):
 
 
 def ask_day(update, context):
-    ask_msg = "Di che giorno vuoi sapere l'orario delle lezioni?\n(giorno mese anno)"
-    update.message.reply_markdown(ask_msg)
+    markup = types.ReplyKeyboardMarkup(
+        one_time_keyboard=True, resize_keyboard=True)
+    today_button = types.KeyboardButton('Oggi')
+    markup.row(today_button)
+    chat_id = update.message.chat_id
+    message = "Di che giorno vuoi sapere l'orario delle lezioni?\n(giorno mese anno)"
+    tb.send_message(chat_id=chat_id, text=message, reply_markup=markup)
     return 1
 
 
 def show_planner(update, context):
     # Get the message from the user
     # and see if it matches the expected format
-    reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
     input_data = update.message.text.lower()
-    result = re.match(reg_ex, input_data)
+    result = False
+    if input_data != 'oggi':
+        reg_ex = r'^([1-9]|[0-2][0-9]|(3)[0-1])((\s)|(\/))([1-9]|(0)[1-9]|(1)[0-2]|gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)((\s)|(\/))(([0-2][0-9])|((20)((0)[0-9]|[1-2][0-9])))$'
+        result = re.match(reg_ex, input_data)
+    if result or input_data == 'oggi':
+        # (input_data != 'oggi') or (input_data != 'domani'):
+        if not input_data == 'oggi':
+            if '/' in input_data:
+                giorno, mese, anno = update.message.text.split('/')
+                mese = month_convertion(mese)
+            else:
+                giorno, mese, anno = update.message.text.split()
+                mese = month_convertion(mese)
 
-    if result:
-        if '/' in input_data:
-            giorno, mese, anno = update.message.text.split('/')
-            mese = month_convertion(mese)
+            # If the input provided is well formatted
+            # check that the date actually exists
+
+            try:
+                datetime.datetime(int(anno), int(mese), int(giorno))
+            except ValueError:
+                error = 'Data inesistente'
+                update.message.reply_markdown(error)
+                return ConversationHandler.END
+
+        if input_data == 'oggi':
+            payload = ' '
         else:
-            giorno, mese, anno = update.message.text.split()
-            mese = month_convertion(mese)
+            payload = {'year': anno, 'month': mese,
+                       'day': giorno, 'area': '1', 'room': '3'}
 
-        # If the input provided is well formatted
-        # check that the date actually exists
-        try:
-            datetime.datetime(int(anno), int(mese), int(giorno))
-        except ValueError:
-            error = 'Data inesistente'
-            update.message.reply_markdown(error)
-            return ConversationHandler.END
-
-        payload = {'year': anno, 'month': mese,
-                   'day': giorno, 'area': '1', 'room': '3'}
         url = 'https://servizi.dmi.unipg.it/mrbs/day.php'
 
         r = requests.get(url=url, params=payload)
@@ -162,6 +175,9 @@ def show_planner(update, context):
                         lezione=lezione, prof=prof, ore=ore)
             if lessons:
                 update.message.reply_markdown(message)
+
+        message = '*Le aule non presenti non hanno lezioni/esami per tutta la giornata*'
+        update.message.reply_markdown(message)
 
         if empty:
             message = 'Non ci sono lezioni nella data scelta'
